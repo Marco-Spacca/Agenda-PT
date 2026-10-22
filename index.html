@@ -150,6 +150,43 @@
             opacity: 1;
             transform: translate(-50%, 0);
         }
+        /* intestazione "Agenda Personal": flette piano piano; click = accesso PT */
+        #brand {
+            color: #d4af37;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            cursor: pointer;
+            padding: 4px 14px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(212,175,55,.4);
+            border-radius: 999px;
+            animation: fluttua 26s ease-in-out infinite alternate;
+        }
+        #brand:hover {
+            border-color: #d4af37;
+        }
+        @keyframes fluttua {
+            0%   { transform: translate(-9px, -4px) rotate(-1.4deg); }
+            50%  { transform: translate(2px, 3px) rotate(0.6deg); }
+            100% { transform: translate(9px, -2px) rotate(1.4deg); }
+        }
+        #last-updated {
+            text-align: center;
+            color: #f3e5ab;
+            opacity: .75;
+            font-size: 10.5px;
+            margin: -3px 0 8px;
+            min-height: 13px;
+        }
+        #versione {
+            text-align: center;
+            color: #f3e5ab;
+            opacity: .5;
+            font-size: 10.5px;
+            margin-top: 14px;
+        }
         .ratio-9-16-wrapper {
             width: 100%;
             max-width: 450px;
@@ -469,17 +506,18 @@
     come indicato nei commenti in cima al file.
 </div>
 
+<header id="brand" title="Accedi come PT">Agenda Personal</header>
 <div class="toolbar">
     <div class="button-group">
         <button class="btn btn-save" id="btn-save" onclick="saveSchedule()" hidden>💾 Salva</button>
         <button class="btn btn-clients" id="btn-clients" hidden>👥 Clienti</button>
-        <button class="btn btn-auth" id="btn-login" onclick="login()" hidden>🔐 Log PT</button>
         <button class="btn btn-auth" id="btn-logout" onclick="logout()" hidden>🚪 Esci</button>
     </div>
 </div>
 
 <div class="ratio-9-16-wrapper">
     <h2 class="header-title">Orario Settimanale</h2>
+    <div id="last-updated"></div>
     <div class="table-responsive">
         <table id="schedule-table">
             <thead>
@@ -546,6 +584,8 @@
     </div>
 </div>
 
+<footer id="versione"></footer>
+
 <!-- Rubrica clienti: visibile solo dopo login PT -->
 <aside class="drawer" id="drawer">
     <h3>👥 Rubrica clienti <button class="drawer-close" onclick="toggleDrawer(false)">✕</button></h3>
@@ -576,6 +616,9 @@
     };
     /* >>> La TUA email Gmail: dopo il login con questo account si sblocca l'editing <<< */
     const ADMIN_EMAIL = "m.quixote.s@gmail.com";
+
+    /* >>> Versione: si incrementa a ogni modifica pubblicata <<< */
+    const APP_VERSION = '1.0.0';
 
     const LS_KEY = 'orario_settimanale_data_gold'; // vecchio salvataggio locale (migrazione una tantum)
     const LONG_PRESS_MS = 350;
@@ -615,6 +658,12 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('versione').textContent = 'Versione ' + APP_VERSION;
+        // intestazione in alto = accesso PT (il pulsante "Log PT" non esiste più)
+        document.getElementById('brand').addEventListener('click', () => {
+            if (isAdmin) { showToast('👨‍🏫 Sei già in modalità PT'); return; }
+            login();
+        });
         // parte dai dati attuali della tabella (o dal vecchio salvataggio locale)
         const old = localStorage.getItem(LS_KEY);
         if (old) {
@@ -652,7 +701,7 @@
     function attachStateListener() {
         db.collection('app').doc('state').onSnapshot(snap => {
             if (snap.exists && Array.isArray(snap.data().cells)) {
-                applyCellsExternal(snap.data().cells);
+                applyCellsExternal(snap.data().cells, snap.data().updatedAt);
             }
         }, err => showToast('⚠️ ' + err.code));
     }
@@ -662,7 +711,6 @@
         document.getElementById('btn-save').hidden = !isAdmin;
         document.getElementById('btn-clients').hidden = !isAdmin;
         document.getElementById('btn-logout').hidden = !isAdmin;
-        document.getElementById('btn-login').hidden = isAdmin;
         if (!isAdmin) toggleDrawer(false);
     }
 
@@ -700,20 +748,30 @@
     function cellsFromJSON(arr) { domCells().forEach((td, i) => { if (arr[i] !== undefined) td.innerHTML = arr[i]; }); }
 
     // applica dati remoti senza interrompere un drag in corso
-    function applyCellsExternal(arr) {
+    function applyCellsExternal(arr, updatedAt) {
         if (areDragging) {
-            pendingCells = arr; // riapplichiamo alla fine del drag
+            pendingCells = { arr, updatedAt }; // riapplichiamo alla fine del drag
             return;
         }
         cellsFromJSON(arr);
+        showUpdatedAt(updatedAt);
     }
     function flushPending() {
-        if (pendingCells) { const p = pendingCells; pendingCells = null; cellsFromJSON(p); }
+        if (pendingCells) { const p = pendingCells; pendingCells = null; cellsFromJSON(p.arr); showUpdatedAt(p.updatedAt); }
+    }
+    // dicitura "Aggiornato al [data] ore [ora]" sotto il titolo
+    function showUpdatedAt(ts) {
+        const el = document.getElementById('last-updated');
+        if (!el) return;
+        if (!ts) { el.textContent = ''; return; }
+        const d = new Date(ts);
+        el.textContent = 'Aggiornato al ' + d.toLocaleDateString('it-IT') + ' ore ' +
+            d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
     }
 
     function saveSchedule() {
         if (!isAdmin || !db) return;
-        db.collection('app').doc('state').set({ cells: grabCells() })
+        db.collection('app').doc('state').set({ cells: grabCells(), updatedAt: Date.now() })
             .then(() => showToast('💾 Salvato e sincronizzato!'))
             .catch(err => showToast('⚠️ ' + err.code));
     }
