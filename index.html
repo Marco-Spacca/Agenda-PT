@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="it">
+<!--
+  ============================================================================
+  ORARIO SETTIMANALE - VERSIONE CONDIVISA (Firebase)
+  ============================================================================
+  COME SI CONFIGURA (5 minuti, una volta sola):
+  1) console.firebase.google.com -> nuovo progetto (Analytics non serve)
+  2) Impostazioni progetto -> Le mie app -> icona </> (Web) -> registra ->
+     copia il blocco firebaseConfig e INCOLLA qui sotto al posto dei segnaposto
+  3) In Impostazioni progetto metti il TUO Gmail anche nella costante ADMIN_EMAIL
+  4) Build -> Firestore Database -> crea (modalita' produzione) -> scheda
+     Regole -> incolla le regole qui sotto (cambia l'email) -> Pubblica
+  5) Build -> Authentication -> Iniziamo -> provider Google -> attiva ->
+     Domini autorizzati -> aggiungi il dominio dove publicherai
+     (es. nomesito.netlify.app o nome.github.io)
+  6) Pubblica il file (es. drag&drop su netlify.com -> Drop) e dai ai clienti
+     il link. Tu entri con 🔐 Log (stesso link, tuo Google) per editare.
+
+  REGOLE FIRESTORE (Firestore Database -> Regole):
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /app/state {
+        allow read: if true;
+        allow write: if request.auth.token.email == "m.quixote.s@gmail.com";
+      }
+      match /app/clients {
+        allow read, write: if request.auth.token.email == "m.quixote.s@gmail.com";
+      }
+    }
+  }
+  ============================================================================
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Orario Settimanale 9:16 - Oro &amp; Bordeaux</title>
+    <!-- Firebase (compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        input {
+            -webkit-user-select: text !important;
+            user-select: text !important;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #3b0a16;
+            margin: 0;
+            padding: 20px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            touch-action: manipulation;
+        }
+        .banner {
+            width: 100%;
+            max-width: 450px;
+            background: #7a1010;
+            border: 2px solid #d4af37;
+            border-radius: 12px;
+            color: #f3e5ab;
+            font-size: 12px;
+            line-height: 1.5;
+            padding: 12px 16px;
+            margin: 0 auto 15px;
+        }
+        .banner code {
+            background: rgba(0,0,0,.35);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+        .toolbar {
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 15px;
+            background: #581123;
+            padding: 10px 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border: 1px solid #d4af37;
+        }
+        .button-group {
+            display: flex;
+            gap: 12px;
+        }
+        .btn {
+            border: none;
+            padding: 8px 16px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-save {
+            background-color: #d4af37;
+            color: #581123;
+        }
+        .btn-save:hover {
+            background-color: #f3e5ab;
+        }
+        .btn-clients {
+            background-color: #400918;
+            color: #d4af37;
+            border: 1px solid #d4af37;
+        }
+        .btn-clients:hover {
+            background-color: #d4af37;
+            color: #581123;
+        }
+        .btn-auth {
+            background-color: #f3e5ab;
+            color: #581123;
+        }
+        [hidden] { display: none !important; }
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translate(-50%, -20px);
+            background-color: #d4af37;
+            color: #581123;
+            font-weight: bold;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+        .ratio-9-16-wrapper {
+            width: 100%;
+            max-width: 450px;
+            background-color: #581123;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            padding: 14px 10px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 2px solid #d4af37;
+        }
+        .header-title {
+            text-align: center;
+            color: #d4af37;
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #d4af37;
+            padding-bottom: 4px;
+            flex-shrink: 0;
+        }
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+            table-layout: fixed;
+        }
+        tr {
+            height: 40px !important;
+        }
+        th, td {
+            border: 1px solid #801b33;
+            padding: 2px 1px;
+            font-size: 10px;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            color: #f3e5ab;
+            line-height: 1.2;
+            height: 40px !important;
+            box-sizing: border-box;
+            position: relative;
+        }
+        th {
+            background-color: #400918;
+            color: #d4af37;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 10px;
+            border-bottom: 2px solid #d4af37;
+        }
+        tr:nth-child(even) td:not(.time-col) {
+            background-color: #4a0d1d;
+        }
+        tr:nth-child(odd) td:not(.time-col) {
+            background-color: #581123;
+        }
+        .time-col {
+            font-weight: 700;
+            background-color: #400918 !important;
+            color: #d4af37;
+            font-size: 9px;
+            width: 18%;
+        }
+        body.admin td:not(.time-col) {
+            cursor: grab;
+        }
+        td.long-press-active {
+            opacity: 0.7;
+            transform: scale(0.95);
+            box-shadow: 0 0 12px #d4af37;
+            border: 2px dashed #d4af37 !important;
+            background-color: #801b33 !important;
+            z-index: 10;
+        }
+        td.drag-over {
+            background-color: #d4af37 !important;
+            color: #581123 !important;
+            box-shadow: inset 0 0 0 2px #ffffff, 0 0 10px rgba(212,175,55,.8);
+            transform: scale(1.07);
+            z-index: 6;
+        }
+        td.just-dropped {
+            animation: droppedFlash .65s ease;
+        }
+        @keyframes droppedFlash {
+            0%   { box-shadow: inset 0 0 0 3px #d4af37, 0 0 16px #d4af37; }
+            100% { box-shadow: 0 0 0 transparent; }
+        }
+        .drag-ghost {
+            position: fixed;
+            left: 0;
+            top: 0;
+            transform: translate(-50%, -140%) scale(1);
+            background: linear-gradient(#f3e5ab, #d4af37);
+            color: #581123;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 7px 14px;
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,.5);
+            border: 1px solid #f3e5ab;
+            pointer-events: none;
+            display: none;
+            z-index: 1001;
+            max-width: 150px;
+            text-align: center;
+            line-height: 1.25;
+        }
+        .drag-ghost.show {
+            display: block;
+            animation: ghostPop .18s ease;
+        }
+        @keyframes ghostPop {
+            from { opacity: 0; transform: translate(-50%, -140%) scale(.5); }
+            to   { opacity: 1; }
+        }
+        del {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        .light {
+            opacity: 0.6;
+            font-style: italic;
+        }
+        /* ---------- Rubrica (solo admin) ---------- */
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 280px;
+            max-width: 90vw;
+            background: #400918;
+            border-left: 2px solid #d4af37;
+            box-shadow: -6px 0 20px rgba(0,0,0,.5);
+            transform: translateX(110%);
+            transition: transform .25s ease;
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            padding: 14px;
+            overflow-y: auto;
+        }
+        .drawer.open {
+            transform: translateX(0);
+        }
+        /* durante un drag dalla rubrica la nascondiamo per liberare la vista */
+        body.chip-dragging .drawer {
+            opacity: 0.15;
+            pointer-events: none;
+        }
+        .drawer h3 {
+            color: #d4af37;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 0 10px;
+            border-bottom: 2px solid #d4af37;
+            padding-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .drawer-close {
+            background: none;
+            border: 1px solid #d4af37;
+            color: #d4af37;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 2px 8px;
+        }
+        .roster-form {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .roster-form input {
+            background: #581123;
+            border: 1px solid #d4af37;
+            border-radius: 6px;
+            color: #f3e5ab;
+            font-size: 12px;
+            padding: 7px 9px;
+        }
+        .roster-form button {
+            background: #d4af37;
+            border: none;
+            color: #581123;
+            font-weight: 700;
+            border-radius: 6px;
+            padding: 7px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .roster {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .chip-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .chip-num {
+            flex-shrink: 0;
+            width: 20px;
+            text-align: right;
+            color: #d4af37;
+            font-weight: 700;
+            font-size: 12px;
+        }
+        .chip {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            background: #581123;
+            border: 1px solid #801b33;
+            border-radius: 10px;
+            padding: 8px 10px;
+            color: #f3e5ab;
+            font-size: 12px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chip strong {
+            flex: 1;
+            min-width: 0;
+            color: #d4af37;
+            font-size: 13px;
+            text-align: left;
+        }
+        .chip .btn-more {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            color: #d4af37;
+            font-size: 15px;
+            cursor: pointer;
+            padding: 0 4px;
+            letter-spacing: 2px;
+        }
+        .chip-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 4px;
+            background: #400918;
+            border: 1px solid #d4af37;
+            border-radius: 8px;
+            box-shadow: 0 6px 16px rgba(0,0,0,.55);
+            display: flex;
+            flex-direction: column;
+            min-width: 130px;
+            overflow: hidden;
+            z-index: 600;
+        }
+        .chip-menu button {
+            background: none;
+            border: none;
+            color: #f3e5ab;
+            font-size: 12.5px;
+            padding: 9px 14px;
+            cursor: pointer;
+            text-align: left;
+        }
+        .chip-menu button:hover {
+            background: #581123;
+            color: #d4af37;
+        }
+        .chip-menu button.danger {
+            color: #ff6b6b;
+        }
+        .chip.drag-active {
+            box-shadow: 0 0 10px #d4af37;
+            border: 2px dashed #d4af37;
+            opacity: .85;
+        }
+        .drawer-note {
+            color: #f3e5ab;
+            opacity: .65;
+            font-size: 10.5px;
+            line-height: 1.4;
+            margin-top: 12px;
+        }
+        .roster-empty {
+            color: #f3e5ab;
+            opacity: .6;
+            font-size: 12px;
+            text-align: center;
+            padding: 12px 0;
+        }
+    </style>
+</head>
+<body>
+
+<div id="toast" class="toast">💾 Salvato e sincronizzato!</div>
+
+<div id="setup-banner" class="banner" hidden>
+    🧪 <strong>Modalità demo locale</strong> — dati salvati solo su questo PC (localStorage).<br>
+    Premi 🔐 <strong>Log PT</strong> per provare l'editing, la rubrica 👥 e il trascinamento.
+    Prima di pubblicare online: incolla <code>firebaseConfig</code> e <code>ADMIN_EMAIL</code>
+    come indicato nei commenti in cima al file.
+</div>
+
+<div class="toolbar">
+    <div class="button-group">
+        <button class="btn btn-save" id="btn-save" onclick="saveSchedule()" hidden>💾 Salva</button>
+        <button class="btn btn-clients" id="btn-clients" hidden>👥 Clienti</button>
+        <button class="btn btn-auth" id="btn-login" onclick="login()" hidden>🔐 Log PT</button>
+        <button class="btn btn-auth" id="btn-logout" onclick="logout()" hidden>🚪 Esci</button>
+    </div>
+</div>
+
+<div class="ratio-9-16-wrapper">
+    <h2 class="header-title">Orario Settimanale</h2>
+    <div class="table-responsive">
+        <table id="schedule-table">
+            <thead>
+                <tr>
+                    <th style="width: 18%;">Ora</th>
+                    <th>Lun</th>
+                    <th>Mar</th>
+                    <th>Mer</th>
+                    <th>Gio</th>
+                    <th>Ven</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="time-col">09:00 - 10:00</td>
+                    <td>Luca<br>Aita</td><td></td><td>Luca<br>Aita</td><td>Franca</td><td>Luca<br>Aita</td>
+                </tr>
+                <tr>
+                    <td class="time-col">10:00 - 11:00</td>
+                    <td>Giampiero</td><td>Fedele</td><td>Giampiero</td><td>Fedele</td><td>Giampiero</td>
+                </tr>
+                <tr>
+                    <td class="time-col">11:00 - 12:00</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                </tr>
+                <tr>
+                    <td class="time-col">12:00 - 13:00</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                </tr>
+                <tr>
+                    <td class="time-col">13:00 - 14:00</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                </tr>
+                <tr>
+                    <td class="time-col">14:00 - 15:00</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                </tr>
+                <tr>
+                    <td class="time-col">15:00 - 16:00</td>
+                    <td></td><td>Franca</td><td>Franca</td><td></td><td>Benedetto</td>
+                </tr>
+                <tr>
+                    <td class="time-col">16:00 - 17:00</td>
+                    <td>Carmen</td><td>Ilaria</td><td>Angelo</td><td>Carmen</td><td>Ilaria</td>
+                </tr>
+                <tr>
+                    <td class="time-col">17:00 - 18:00</td>
+                    <td>Angelo</td><td>Alessandro</td><td>X</td><td>Alessandro</td><td>Luca<br>Occhiuzzo</td>
+                </tr>
+                <tr>
+                    <td class="time-col">18:00 - 19:00</td>
+                    <td>Benedetto</td><td>Luca<br>Occhiuzzo</td><td>Benedetto</td><td></td><td>Angelo</td>
+                </tr>
+                <tr>
+                    <td class="time-col">19:00 - 20:00</td>
+                    <td>X</td><td>Ksenia</td><td>Luca<br>Occhiuzzo</td><td>Ksenia</td><td>X</td>
+                </tr>
+                <tr>
+                    <td class="time-col">20:00 - 21:00</td>
+                    <td>Immacolata</td><td>Immacolata</td><td></td><td>Immacolata</td><td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Rubrica clienti: visibile solo dopo login PT -->
+<aside class="drawer" id="drawer">
+    <h3>👥 Rubrica clienti <button class="drawer-close" onclick="toggleDrawer(false)">✕</button></h3>
+    <form class="roster-form" id="roster-form">
+        <input id="in-nome" placeholder="Nome" autocomplete="off">
+        <input id="in-cognome" placeholder="Cognome" autocomplete="off">
+        <button type="submit" id="btn-submit-roster">➕ Aggiungi cliente</button>
+        <button type="button" id="btn-cancel-roster" hidden>✕ Annulla modifica</button>
+    </form>
+    <ul class="roster" id="roster"></ul>
+    <p class="drawer-note">💡 Trascina un cliente (tieni premuto) su una cella dell'orario per
+       inserirlo in quel turno. Le celle si scambiano trascinandole tra loro; trascina il
+       contenuto di una cella FUORI dalla tabella per rimuoverlo.</p>
+</aside>
+
+<script>
+    /* =========================================================================
+       >>> INCOLLA QUI la firebaseConfig del tuo progetto <<<
+       (Firebase console -> Impostazioni progetto -> Le mie app -> </> Web)
+       ========================================================================= */
+    const firebaseConfig = {
+        apiKey: "AIzaSyBTPDpu1kasndaio8BhTYffWtqytgY28AA",
+        authDomain: "agenda-pt-b0914.firebaseapp.com",
+        projectId: "agenda-pt-b0914",
+        storageBucket: "agenda-pt-b0914.firebasestorage.app",
+        messagingSenderId: "696629741948",
+        appId: "1:696629741948:web:ce344ee914cb57df14fcf9"
+    };
+    /* >>> La TUA email Gmail: dopo il login con questo account si sblocca l'editing <<< */
+    const ADMIN_EMAIL = "m.quixote.s@gmail.com";
+
+    const LS_KEY = 'orario_settimanale_data_gold'; // vecchio salvataggio locale (migrazione una tantum)
+    const LONG_PRESS_MS = 350;
+
+    let db = null;
+    let isAdmin = false;
+    let clients = [];              // [{nome, cognome, tel}]
+    let pendingCells = null;       // righe arrivo da Firestore sospese durante edit/drag
+
+    // stato drag
+    let dragMode = null;           // 'cell' | 'client'
+    let pressTimer = null;
+    let areDragging = false;
+    let sourceCell = null;         // modalità 'cell'
+    let dragClientIdx = -1;        // modalità 'client'
+    let hoverCell = null;
+    let dragX = 0;                 // coordinate correnti del dito/mouse durante il press
+    let dragY = 0;
+    let ghost = null;              // "cartellino" che segue il dito durante il drag
+
+    const configOk = String(firebaseConfig.apiKey).indexOf('INCOLLA') === -1;
+
+    // ponytail: demo senza Firebase — stesso contratto di .collection().doc(), replica su localStorage
+    function makeFakeDb() {
+        const doc = (coll, id) => {
+            const key = 'demo_' + coll + '_' + id;
+            return {
+                set: d => { try { localStorage.setItem(key, JSON.stringify(d)); } catch (e) {} return Promise.resolve(); },
+                onSnapshot: cb => {
+                    const raw = localStorage.getItem(key);
+                    if (raw) { try { cb({ exists: true, data: () => JSON.parse(raw) }); } catch (e) {} }
+                    return () => {};
+                }
+            };
+        };
+        return { collection: c => ({ doc: id => doc(c, id) }) };
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // parte dai dati attuali della tabella (o dal vecchio salvataggio locale)
+        const old = localStorage.getItem(LS_KEY);
+        if (old) {
+            try { cellsFromJSON(JSON.parse(old)); } catch (e) { /* dati corrotti: tabella demo */ }
+        }
+        renderRoster();
+
+        if (!configOk) {
+            // MODALITÀ DEMO LOCALE: niente Firebase, dati in localStorage (questo PC).
+            // Utile per provare tutto prima dell'implementazione. ponytail: stub fake-db,
+            // con la config vera sostituirlo in toto.
+            document.getElementById('setup-banner').hidden = false;
+            db = makeFakeDb();
+            attachStateListener(); // demo: ripristina l'orario salvato localmente
+            updateUI();            // mostra i bottoni giusti (vista cliente di default)
+            initInteractions();
+            return;
+        }
+
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        attachStateListener();
+
+        firebase.auth().onAuthStateChanged(user => {
+            isAdmin = !!(user && user.email === ADMIN_EMAIL);
+            updateUI();
+            if (isAdmin) watchClients();
+        });
+
+        initInteractions();
+    });
+
+    /* ============================ UI: admin/utente ============================ */
+
+    function attachStateListener() {
+        db.collection('app').doc('state').onSnapshot(snap => {
+            if (snap.exists && Array.isArray(snap.data().cells)) {
+                applyCellsExternal(snap.data().cells);
+            }
+        }, err => showToast('⚠️ ' + err.code));
+    }
+
+    function updateUI() {
+        document.body.classList.toggle('admin', isAdmin);
+        document.getElementById('btn-save').hidden = !isAdmin;
+        document.getElementById('btn-clients').hidden = !isAdmin;
+        document.getElementById('btn-logout').hidden = !isAdmin;
+        document.getElementById('btn-login').hidden = isAdmin;
+        if (!isAdmin) toggleDrawer(false);
+    }
+
+    function login() {
+        if (!configOk) { // DEMO LOCALE: login simulato
+            isAdmin = true;
+            updateUI();
+            watchClients();
+            showToast('👨‍🏫 Modalità PT (demo locale)');
+            return;
+        }
+        firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
+            .catch(err => showToast('⚠️ ' + err.code));
+    }
+    function logout() {
+        if (!configOk) { // DEMO LOCALE: logout simulato
+            isAdmin = false;
+            updateUI();
+            return;
+        }
+        firebase.auth().signOut();
+    }
+
+    function toggleDrawer(open) {
+        document.getElementById('drawer').classList.toggle('open', open);
+    }
+    document.getElementById('btn-clients').addEventListener('click', () => toggleDrawer(true));
+
+    /* ============================ Orario: render ============================= */
+
+    function domCells() {
+        return Array.from(document.querySelectorAll('#schedule-table tbody td:not(.time-col)'));
+    }
+    function grabCells() { return domCells().map(td => td.innerHTML); }
+    function cellsFromJSON(arr) { domCells().forEach((td, i) => { if (arr[i] !== undefined) td.innerHTML = arr[i]; }); }
+
+    // applica dati remoti senza interrompere un drag in corso
+    function applyCellsExternal(arr) {
+        if (areDragging) {
+            pendingCells = arr; // riapplichiamo alla fine del drag
+            return;
+        }
+        cellsFromJSON(arr);
+    }
+    function flushPending() {
+        if (pendingCells) { const p = pendingCells; pendingCells = null; cellsFromJSON(p); }
+    }
+
+    function saveSchedule() {
+        if (!isAdmin || !db) return;
+        db.collection('app').doc('state').set({ cells: grabCells() })
+            .then(() => showToast('💾 Salvato e sincronizzato!'))
+            .catch(err => showToast('⚠️ ' + err.code));
+    }
+
+    /* ============================ Rubrica clienti ============================= */
+
+    function watchClients() {
+        db.collection('app').doc('clients').onSnapshot(snap => {
+            clients = (snap.exists && Array.isArray(snap.data().list)) ? snap.data().list : [];
+            renderRoster();
+        }, err => showToast('⚠️ ' + err.code));
+    }
+
+    function saveClients() {
+        if (!db) return;
+        db.collection('app').doc('clients').set({ list: clients }).catch(err => showToast('⚠️ ' + err.code));
+    }
+
+    function renderRoster() {
+        const ul = document.getElementById('roster');
+        ul.innerHTML = '';
+        if (!clients.length) {
+            const li = document.createElement('li');
+            li.className = 'roster-empty';
+            li.textContent = 'Nessun cliente in rubrica.';
+            ul.appendChild(li);
+            return;
+        }
+        clients.forEach((c, idx) => {
+            const li = document.createElement('li');
+            li.className = 'chip-row';
+
+            // numero progressivo FUORI dal bottone trascinabile
+            const num = document.createElement('span');
+            num.className = 'chip-num';
+            num.textContent = idx + 1;
+
+            const chip = document.createElement('div');
+            chip.className = 'chip';
+
+            const more = document.createElement('button');
+            more.className = 'btn-more';
+            more.textContent = '⋯';
+            more.title = 'Opzioni';
+            more.addEventListener('mousedown', e => e.stopPropagation());
+            more.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+            more.addEventListener('click', e => {
+                e.stopPropagation();
+                const wasOpen = !li.querySelector('.chip-menu').hidden;
+                closeMenus();
+                if (!wasOpen) li.querySelector('.chip-menu').hidden = false;
+            });
+
+            const menu = document.createElement('span');
+            menu.className = 'chip-menu';
+            menu.hidden = true;
+            const actEdit = document.createElement('button');
+            actEdit.textContent = '✎ Modifica';
+            actEdit.addEventListener('click', e => {
+                e.stopPropagation();
+                closeMenus();
+                setRosterEditing(idx);
+                document.getElementById('in-nome').value = c.nome || '';
+                document.getElementById('in-cognome').value = c.cognome || '';
+                document.getElementById('in-nome').focus();
+            });
+            const actDel = document.createElement('button');
+            actDel.className = 'danger';
+            actDel.textContent = '🗑 Rimuovi';
+            actDel.addEventListener('click', e => {
+                e.stopPropagation();
+                closeMenus();
+                if (confirm('Rimuovere ' + niceCase(((c.nome || '') + ' ' + (c.cognome || '')).trim()) + ' dalla rubrica?')) {
+                    if (editingRosterIdx === idx) setRosterEditing(-1);
+                    clients.splice(idx, 1);
+                    renderRoster();
+                    saveClients();
+                }
+            });
+            menu.appendChild(actEdit);
+            menu.appendChild(actDel);
+
+            const name = document.createElement('strong');
+            const fullName = ((c.nome || '') + ' ' + (c.cognome || '')).trim();
+            name.textContent = niceCase(fullName) || '(senza nome)';
+
+            chip.appendChild(name);
+            chip.appendChild(more);  // "..." a destra del nome
+            chip.appendChild(menu);  // menu a scomparsa (posizionato in assoluto sul chip)
+
+            // pressione lunga su touch / drag immediato col mouse
+            chip.addEventListener('mousedown', e => { if (e.button !== 0) return; startDrag('client', idx, e.clientX, e.clientY, 0); });
+            chip.addEventListener('touchstart', e => startDrag('client', idx, e.touches[0].clientX, e.touches[0].clientY), { passive: false });
+            chip.addEventListener('touchmove', e => {
+                if (!areDragging) {
+                    // micro-tremolio del dito (<10px): non annullare la press
+                    const t = e.touches[0];
+                    if (Math.hypot(t.clientX - dragX, t.clientY - dragY) < 10) return;
+                    cancelPress();
+                    return;
+                }
+                e.preventDefault();
+                onDragPoint(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: false });
+
+            li.appendChild(num);
+            li.appendChild(chip);
+            ul.appendChild(li);
+        });
+    }
+
+    // stato della modifica di un cliente dalla rubrica
+    let editingRosterIdx = -1;
+
+    function closeMenus() {
+        document.querySelectorAll('.chip-menu').forEach(m => { m.hidden = true; });
+    }
+    document.addEventListener('click', e => {
+        if (e.target.closest && (e.target.closest('.chip-menu') || e.target.closest('.btn-more'))) return;
+        closeMenus();
+    });
+
+    function setRosterEditing(idx) {
+        editingRosterIdx = idx;
+        document.getElementById('btn-submit-roster').textContent = idx >= 0 ? '✔ Aggiorna' : '➕ Aggiungi cliente';
+        document.getElementById('btn-cancel-roster').hidden = idx < 0;
+    }
+
+    document.getElementById('btn-cancel-roster').addEventListener('click', () => {
+        setRosterEditing(-1);
+        document.getElementById('roster-form').reset();
+    });
+
+    document.getElementById('roster-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const nome = document.getElementById('in-nome').value.trim();
+        const cognome = document.getElementById('in-cognome').value.trim();
+        if (!nome && !cognome) return;
+        if (editingRosterIdx >= 0) {
+            // aggiorna il cliente esistente
+            const c = clients[editingRosterIdx];
+            c.nome = nome;
+            c.cognome = cognome;
+            setRosterEditing(-1);
+        } else {
+            clients.push({ nome, cognome });
+        }
+        document.getElementById('roster-form').reset();
+        renderRoster();
+        if (db) saveClients();
+    });
+
+    /* ========================= Trascinamento celle (solo PT) ================== */
+
+    function onCellTapDown(e) {
+        const td = e.target.closest && e.target.closest('#schedule-table tbody td:not(.time-col)');
+        if (!td || !isAdmin) return;
+        if (e.type === 'mousedown') {
+            if (e.button !== 0) return;
+            startDrag('cell', td, e.clientX, e.clientY, 0); // mouse: parte subito
+        } else {
+            startDrag('cell', td, e.touches[0].clientX, e.touches[0].clientY); // touch: press lunga
+        }
+    }
+
+    function initInteractions() {
+        const tds = document.querySelectorAll('#schedule-table tbody td:not(.time-col)');
+
+        tds.forEach(td => {
+            td.addEventListener('touchstart', onCellTapDown, { passive: false });
+            td.addEventListener('mousedown', onCellTapDown);
+            td.addEventListener('touchmove', function(e) {
+                if (!areDragging) {
+                    // micro-tremolio del dito (<10px): non annullare la press
+                    const t = e.touches[0];
+                    if (Math.hypot(t.clientX - dragX, t.clientY - dragY) < 10) return;
+                    cancelPress();
+                    return;
+                }
+                e.preventDefault();
+                onDragPoint(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: false });
+            td.addEventListener('touchcancel', () => { cancelPress(); resetDragStates(); });
+        });
+
+        // mouse: trascina e rilascia ovunque (anche fuori dalla tabella)
+        document.addEventListener('mousemove', e => {
+            if (areDragging) onDragPoint(e.clientX, e.clientY);
+        });
+        document.addEventListener('mouseup', onDragEndEvent);
+        document.addEventListener('touchend', onDragEndEvent);
+    }
+
+    function onDragEndEvent(e) {
+        if (areDragging) {
+            if (e.type === 'touchend' && e.cancelable) e.preventDefault();
+            finishDrag();
+        } else {
+            cancelPress();
+        }
+    }
+
+    /* ============================ Motore di drag ============================== */
+
+    // delay = tempo di attesa: 350ms su touch, 0 con il mouse (drag immediato)
+    function startDrag(mode, arg, x, y, delay = LONG_PRESS_MS) {
+        cancelPress();
+        if (mode === 'cell') sourceCell = arg;
+        else dragClientIdx = arg;
+        dragX = x;
+        dragY = y;
+        dragMode = mode;
+        if (delay > 0) pressTimer = setTimeout(activateDrag, delay);
+        else activateDrag();
+    }
+
+    function ensureGhost() {
+        if (!ghost) {
+            ghost = document.createElement('div');
+            ghost.className = 'drag-ghost';
+            document.body.appendChild(ghost);
+        }
+        return ghost;
+    }
+
+    function activateDrag() {
+        areDragging = true;
+        if (dragMode === 'cell' && sourceCell) {
+            sourceCell.classList.add('long-press-active');
+            // testo della cella (senza tag) nel fantoccio
+            ensureGhost().textContent =
+                sourceCell.innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+        if (dragMode === 'client' && clients[dragClientIdx]) {
+            document.body.classList.add('chip-dragging');
+            const chip = document.querySelectorAll('#roster .chip')[dragClientIdx];
+            if (chip) chip.classList.add('drag-active');
+            ensureGhost().textContent = clientLabel(clients[dragClientIdx]);
+        }
+        if (ghost) {
+            ghost.style.left = dragX + 'px';
+            ghost.style.top = dragY + 'px';
+            ghost.classList.add('show');
+        }
+        if (navigator.vibrate) navigator.vibrate(50);
+    }
+
+    function cancelPress() {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    }
+
+    // muove il fantoccio + evidenzia la cella di destinazione
+    function onDragPoint(x, y) {
+        dragX = x;
+        dragY = y;
+        if (ghost) { ghost.style.left = x + 'px'; ghost.style.top = y + 'px'; }
+        highlightTargetUnderPoint(x, y);
+    }
+
+    function highlightTargetUnderPoint(x, y) {
+        const elem = document.elementFromPoint(x, y);
+        const targetTd = elem ? elem.closest('#schedule-table tbody td:not(.time-col)') : null;
+
+        if (hoverCell && hoverCell !== targetTd) hoverCell.classList.remove('drag-over');
+
+        if (targetTd && targetTd !== sourceCell) {
+            targetTd.classList.add('drag-over');
+            hoverCell = targetTd;
+        } else {
+            hoverCell = null;
+        }
+    }
+
+    function finishDrag() {
+        const mode = dragMode;
+        const client = clients[dragClientIdx];
+        const cellForFlash = hoverCell; // da catturare PRIMA del reset
+        let changed = false;
+        if (mode === 'cell' && sourceCell) {
+            if (hoverCell && hoverCell !== sourceCell) {
+                // scambio con la cella di destinazione
+                const temp = hoverCell.innerHTML;
+                hoverCell.innerHTML = sourceCell.innerHTML;
+                sourceCell.innerHTML = temp;
+                changed = true;
+            } else if (!releaseTd()) {
+                // rilasciato FUORI dalla tabella → il contenuto viene rimosso
+                sourceCell.innerHTML = '';
+                changed = true;
+            }
+            // rilasciato sulla cella di partenza → no-op
+        } else if (mode === 'client' && client && hoverCell) {
+            hoverCell.innerHTML = clientLabel(client);
+            changed = true;
+        }
+        resetDragStates();
+        if (cellForFlash) {
+            cellForFlash.classList.add('just-dropped');
+            setTimeout(() => cellForFlash.classList.remove('just-dropped'), 700);
+        }
+        if (changed) {
+            saveSchedule(); // scambio, inserimento o rimozione → sync cloud
+            showToast(mode === 'client' ? '✅ Inserito!' : '✅ Ok!');
+        }
+        flushPending();
+    }
+
+    // dove si trova il puntatore ORA (per capire "fuori dalla tabella")
+    function releaseTd() {
+        const elem = document.elementFromPoint(dragX, dragY);
+        return elem ? elem.closest('#schedule-table tbody td:not(.time-col)') : null;
+    }
+
+    // "marco de" -> "Marco De" (soloiniziali maiuscole)
+    function niceCase(s) {
+        return String(s).toLowerCase().replace(/(^|[\s\-'])([a-zà-öø-ÿ])/g, (m, p, c) => p + c.toUpperCase());
+    }
+
+    // In tabella solo il NOME; il COGNOME solo se ci sono più clienti
+    // con lo stesso nome (es. Luca Aita vs Luca Occhiuzzo) per distinguerli.
+    function clientLabel(client) {
+        const nome = niceCase(client.nome || '');
+        const cognome = niceCase(client.cognome || '');
+        if (!nome) return cognome;
+        const varianti = new Set(
+            clients.filter(c => niceCase(c.nome || '') === nome)
+                   .map(c => niceCase(c.cognome || ''))
+        );
+        return (varianti.size > 1 && cognome) ? (nome + '<br>' + cognome) : nome;
+    }
+
+    function resetDragStates() {
+        cancelPress();
+        areDragging = false;
+        document.body.classList.remove('chip-dragging');
+        if (ghost) ghost.classList.remove('show');
+        if (sourceCell) { sourceCell.classList.remove('long-press-active'); sourceCell = null; }
+        document.querySelectorAll('#roster .chip').forEach(c => c.classList.remove('drag-active'));
+        document.querySelectorAll('td').forEach(td => td.classList.remove('drag-over', 'long-press-active'));
+        hoverCell = null;
+        dragMode = null;
+        dragClientIdx = -1;
+    }
+
+    /* ============================== PDF / Toast ============================== */
+
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg || '💾 Salvato e sincronizzato!';
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+</script>
+
+</body>
+</html>
