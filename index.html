@@ -150,27 +150,26 @@
             opacity: 1;
             transform: translate(-50%, 0);
         }
-        /* intestazione "Agenda Personal": flette piano piano; click = accesso PT */
+        /* intestazione "Agenda Personal": grande, senza contorno, fluttua piano piano; click = accesso PT */
         #brand {
             color: #d4af37;
-            font-size: 15px;
+            font-size: 22px;
             font-weight: 700;
-            letter-spacing: 3px;
+            letter-spacing: 4px;
             text-transform: uppercase;
             cursor: pointer;
-            padding: 4px 14px;
-            margin-bottom: 10px;
-            border: 1px solid rgba(212,175,55,.4);
-            border-radius: 999px;
+            padding: 6px 0;
+            margin-bottom: 4px;
             animation: fluttua 26s ease-in-out infinite alternate;
-        }
-        #brand:hover {
-            border-color: #d4af37;
         }
         @keyframes fluttua {
             0%   { transform: translate(-9px, -4px) rotate(-1.4deg); }
             50%  { transform: translate(2px, 3px) rotate(0.6deg); }
             100% { transform: translate(9px, -2px) rotate(1.4deg); }
+        }
+        /* la barra comandi compare solo quando c'è qualcosa da mostrare (PT) */
+        body:not(.admin) .toolbar {
+            display: none;
         }
         #last-updated {
             text-align: center;
@@ -618,7 +617,7 @@
     const ADMIN_EMAIL = "m.quixote.s@gmail.com";
 
     /* >>> Versione: si incrementa a ogni modifica pubblicata <<< */
-    const APP_VERSION = '1.0.0';
+    const APP_VERSION = '1.0.1';
 
     const LS_KEY = 'orario_settimanale_data_gold'; // vecchio salvataggio locale (migrazione una tantum)
     const LONG_PRESS_MS = 350;
